@@ -1,0 +1,6 @@
+/target
+/uploads
+*.db
+*.db-journal
+*.db-wal
+*.db-shm

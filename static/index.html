@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lineup Card Maker</title>
+    <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+    <!-- Auth view -->
+    <div id="auth-view" class="auth-view hidden">
+        <div class="auth-card">
+            <h1>⚾ Lineup Card Maker</h1>
+            <p class="tagline">Build, save, and print professional baseball lineup cards.</p>
+            <div class="tabs">
+                <button id="tab-login" class="tab active">Log in</button>
+                <button id="tab-signup" class="tab">Sign up</button>
+            </div>
+            <form id="auth-form">
+                <label>Email
+                    <input type="email" id="auth-email" autocomplete="email" required />
+                </label>
+                <label>Password
+                    <input type="password" id="auth-password" autocomplete="current-password" required />
+                </label>
+                <p id="auth-error" class="error"></p>
+                <button type="submit" id="auth-submit" class="primary">Log in</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main app -->
+    <div id="app-view" class="hidden">
+        <header class="topbar">
+            <div class="brand">⚾ Lineup Card Maker</div>
+            <div class="topbar-right">
+                <label class="inline">Team
+                    <select id="team-select"></select>
+                </label>
+                <button id="new-team-btn" class="ghost">+ New team</button>
+                <span id="user-email" class="user-email"></span>
+                <button id="logout-btn" class="ghost">Log out</button>
+            </div>
+        </header>
+
+        <main class="layout">
+            <!-- Left column: team + roster -->
+            <section class="col col-left">
+                <div class="panel" id="team-panel">
+                    <h2>Team</h2>
+                    <div id="team-fields" class="stack">
+                        <label>Team name<input id="team-name" type="text" /></label>
+                        <label>Head coach<input id="team-head" type="text" /></label>
+                        <label>Assistant coaches<input id="team-assts" type="text" placeholder="comma separated" /></label>
+                        <div class="logo-row">
+                            <div class="logo-preview" id="logo-preview">No logo</div>
+                            <div class="stack grow">
+                                <input type="file" id="logo-file" accept="image/png,image/jpeg" />
+                                <button id="save-team-btn" class="primary small">Save team</button>
+                            </div>
+                        </div>
+                        <button id="delete-team-btn" class="danger small">Delete team</button>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <h2>Roster</h2>
+                    <form id="player-form" class="player-form">
+                        <input id="player-number" type="text" inputmode="numeric" placeholder="#" class="w-num" />
+                        <input id="player-name" type="text" placeholder="Player name" class="grow" required />
+                        <select id="player-pos" class="w-pos"></select>
+                        <button type="submit" class="primary small">Add</button>
+                    </form>
+                    <ul id="roster-list" class="roster-list"></ul>
+                </div>
+            </section>
+
+            <!-- Middle column: builder -->
+            <section class="col col-mid">
+                <div class="panel">
+                    <h2>Game</h2>
+                    <div class="game-grid">
+                        <label>Opponent<input id="meta-opponent" type="text" /></label>
+                        <label>Date<input id="meta-date" type="date" /></label>
+                        <label>Location<input id="meta-location" type="text" /></label>
+                        <label>Home / Away
+                            <select id="meta-homeaway">
+                                <option value="">—</option>
+                                <option value="home">Home</option>
+                                <option value="away">Away</option>
+                            </select>
+                        </label>
+                        <label class="check"><input id="meta-dh" type="checkbox" /> Use DH</label>
+                        <label class="check"><input id="meta-eh" type="checkbox" /> Use EH</label>
+                        <label>Lineup name<input id="meta-name" type="text" placeholder="optional label" /></label>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-head">
+                        <h2>Batting order</h2>
+                        <span class="hint">Drag a player from the pool into a spot</span>
+                    </div>
+                    <ol id="lineup-spots" class="lineup-spots"></ol>
+                </div>
+
+                <div class="panel">
+                    <h2>Players</h2>
+                    <p class="hint">Placed players are struck through.</p>
+                    <div id="player-pool" class="player-pool"></div>
+                </div>
+
+                <div class="panel actions-panel">
+                    <div class="lineup-actions">
+                        <label class="inline">Saved
+                            <select id="lineup-select"><option value="">— new lineup —</option></select>
+                        </label>
+                        <button id="save-lineup-btn" class="primary">Save lineup</button>
+                        <button id="delete-lineup-btn" class="ghost">Delete</button>
+                        <button id="pdf-btn" class="accent">Print / PDF…</button>
+                    </div>
+                    <p id="status-msg" class="status"></p>
+                </div>
+            </section>
+
+            <!-- Right column: preview -->
+            <section class="col col-right">
+                <div class="panel">
+                    <h2>Preview</h2>
+                    <div id="card-preview" class="card-preview"></div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- PDF dialog -->
+    <dialog id="pdf-dialog">
+        <form method="dialog" class="stack">
+            <h3>Print copies</h3>
+            <p class="hint">Choose how many of each card to place on the printable sheet. Cards print with cut lines; the umpire card is sized ~3.5&times;5&Prime; to fit an umpire holder.</p>
+            <label class="inline">Home coach (large)<input type="number" id="copies-coach" min="0" max="20" value="1" /></label>
+            <label class="inline">Scorekeeper (large)<input type="number" id="copies-score" min="0" max="20" value="1" /></label>
+            <label class="inline">Manager / you (large)<input type="number" id="copies-self" min="0" max="20" value="1" /></label>
+            <label class="inline">Umpire (small 3.5&times;5)<input type="number" id="copies-ump" min="0" max="20" value="1" /></label>
+            <div class="dialog-actions">
+                <button value="cancel" class="ghost">Cancel</button>
+                <button value="ok" id="pdf-go" class="accent">Open PDF</button>
+            </div>
+        </form>
+    </dialog>
+
+    <script src="/app.js"></script>
+</body>
+</html>
