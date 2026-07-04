@@ -1,0 +1,22 @@
+name: Fly Deploy
+
+# Deploys the app to Fly.io. Runs automatically on every push to the branch,
+# and can also be triggered by hand from the GitHub "Actions" tab
+# (Run workflow) — handy from a phone.
+on:
+  push:
+    branches:
+      - claude/baseball-lineup-card-1xsg01
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy app
+    runs-on: ubuntu-latest
+    concurrency: deploy-group # never run two deploys at once
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - run: flyctl deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
