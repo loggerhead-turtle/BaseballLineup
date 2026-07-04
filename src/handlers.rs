@@ -331,8 +331,8 @@ pub async fn create_lineup(
 ) -> AppResult<Response> {
     owned_team(&state, user.id, team_id).await?;
     let rec: (i64,) = sqlx::query_as(
-        "INSERT INTO lineups (team_id, name, opponent, game_date, location, home_away, use_dh, use_eh) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+        "INSERT INTO lineups (team_id, name, opponent, game_date, location, home_away, use_dh, use_eh, dh_mode) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(team_id)
     .bind(&payload.name)
@@ -342,6 +342,7 @@ pub async fn create_lineup(
     .bind(&payload.home_away)
     .bind(payload.use_dh as i64)
     .bind(payload.use_eh as i64)
+    .bind(&payload.dh_mode)
     .fetch_one(&state.pool)
     .await?;
     replace_spots(&state, rec.0, &payload.spots).await?;
@@ -376,7 +377,7 @@ pub async fn update_lineup(
     owned_lineup(&state, user.id, id).await?;
     sqlx::query(
         "UPDATE lineups SET name = ?, opponent = ?, game_date = ?, location = ?, \
-         home_away = ?, use_dh = ?, use_eh = ? WHERE id = ?",
+         home_away = ?, use_dh = ?, use_eh = ?, dh_mode = ? WHERE id = ?",
     )
     .bind(&payload.name)
     .bind(&payload.opponent)
@@ -385,6 +386,7 @@ pub async fn update_lineup(
     .bind(&payload.home_away)
     .bind(payload.use_dh as i64)
     .bind(payload.use_eh as i64)
+    .bind(&payload.dh_mode)
     .bind(id)
     .execute(&state.pool)
     .await?;

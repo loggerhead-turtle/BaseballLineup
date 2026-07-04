@@ -90,9 +90,15 @@
                                 <option value="away">Away</option>
                             </select>
                         </label>
-                        <label class="check"><input id="meta-dh" type="checkbox" /> Use DH</label>
-                        <label class="check"><input id="meta-eh" type="checkbox" /> Use EH</label>
                         <label>Lineup name<input id="meta-name" type="text" placeholder="optional label" /></label>
+                        <label class="span2">DH mode
+                            <select id="meta-dhmode">
+                                <option value="straight9">Straight 9 (no DH)</option>
+                                <option value="traditional">Traditional DH (DH bats for a fielder)</option>
+                                <option value="player">Player DH (two-way: DH also fields)</option>
+                            </select>
+                        </label>
+                        <p class="hint span2" id="dhmode-hint"></p>
                     </div>
                 </div>
 

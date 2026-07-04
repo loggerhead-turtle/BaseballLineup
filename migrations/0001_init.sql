@@ -42,6 +42,8 @@ CREATE TABLE IF NOT EXISTS lineups (
     home_away  TEXT NOT NULL DEFAULT '',
     use_dh     INTEGER NOT NULL DEFAULT 0,
     use_eh     INTEGER NOT NULL DEFAULT 0,
+    -- DH mode: 'straight9' | 'traditional' | 'player'
+    dh_mode    TEXT NOT NULL DEFAULT 'straight9',
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

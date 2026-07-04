@@ -256,11 +256,18 @@ function fillLineupSelect() {
 }
 
 // ---------- Lineup state ----------
-function slotIds() {
+function battingIds() {
     const ids = [];
     for (let i = 1; i <= 9; i++) ids.push(String(i));
-    if (state.meta.use_dh) ids.push("DH");
-    if (state.meta.use_eh) ids.push("EH");
+    return ids;
+}
+function hasDef() {
+    return state.meta.dh_mode && state.meta.dh_mode !== "straight9";
+}
+// Rows shown in the builder / preview: the 9 batters, plus the DEF line in a DH mode.
+function slotIds() {
+    const ids = battingIds();
+    if (hasDef()) ids.push("DEF");
     return ids;
 }
 
@@ -268,10 +275,10 @@ function newLineup() {
     state.lineupId = null;
     state.assignments = {};
     state.positions = {};
-    state.twoWayDH = {};
-    state.meta = { opponent: "", game_date: "", location: "", home_away: "", use_dh: false, use_eh: false, name: "" };
+    state.meta = { opponent: "", game_date: "", location: "", home_away: "", use_dh: false, use_eh: false, dh_mode: "straight9", name: "" };
     // default fielding positions for the first nine spots
     for (let i = 1; i <= 9; i++) state.positions[String(i)] = POSITIONS[i - 1] || "";
+    state.positions["DEF"] = "P";
     fillMetaFields();
     $("lineup-select").value = "";
 }
@@ -281,9 +288,22 @@ function fillMetaFields() {
     $("meta-date").value = state.meta.game_date;
     $("meta-location").value = state.meta.location;
     $("meta-homeaway").value = state.meta.home_away;
-    $("meta-dh").checked = state.meta.use_dh;
-    $("meta-eh").checked = state.meta.use_eh;
+    $("meta-dhmode").value = state.meta.dh_mode || "straight9";
     $("meta-name").value = state.meta.name;
+    updateDhHint();
+}
+
+function updateDhHint() {
+    const h = $("dhmode-hint");
+    if (!h) return;
+    const m = state.meta.dh_mode;
+    if (m === "traditional") {
+        h.textContent = "Set the DH's batting spot position to DH, and put the fielder they bat for on the DEF line.";
+    } else if (m === "player") {
+        h.textContent = "Two-way player: set their batting spot to DH, and put the SAME player on the DEF line with their fielding position.";
+    } else {
+        h.textContent = "Nine batters, each with a fielding position.";
+    }
 }
 
 async function loadLineup(id) {
@@ -296,16 +316,15 @@ async function loadLineup(id) {
         home_away: detail.home_away || "",
         use_dh: !!detail.use_dh,
         use_eh: !!detail.use_eh,
+        dh_mode: detail.dh_mode || "straight9",
         name: detail.name || "",
     };
     state.assignments = {};
     state.positions = {};
-    state.twoWayDH = {};
     for (const sp of detail.spots) {
-        const slot = sp.slot_kind === "DH" ? "DH" : sp.slot_kind === "EH" ? "EH" : String(sp.batting_order);
+        const slot = sp.slot_kind === "DEF" ? "DEF" : String(sp.batting_order);
         if (sp.player_id != null) state.assignments[slot] = sp.player_id;
         state.positions[slot] = sp.position || "";
-        if (sp.is_dh) state.twoWayDH[slot] = true;
     }
     fillMetaFields();
     renderAll();
@@ -313,15 +332,22 @@ async function loadLineup(id) {
 
 function collectSpots() {
     const spots = [];
-    for (const id of slotIds()) {
-        const kind = id === "DH" ? "DH" : id === "EH" ? "EH" : "BAT";
-        const order = id === "DH" ? 10 : id === "EH" ? 11 : parseInt(id, 10);
+    for (const id of battingIds()) {
         spots.push({
-            batting_order: order,
-            slot_kind: kind,
+            batting_order: parseInt(id, 10),
+            slot_kind: "BAT",
             player_id: state.assignments[id] != null ? state.assignments[id] : null,
             position: state.positions[id] || "",
-            is_dh: !!state.twoWayDH[id],
+            is_dh: false,
+        });
+    }
+    if (hasDef()) {
+        spots.push({
+            batting_order: 10,
+            slot_kind: "DEF",
+            player_id: state.assignments["DEF"] != null ? state.assignments["DEF"] : null,
+            position: state.positions["DEF"] || "",
+            is_dh: false,
         });
     }
     return spots;
@@ -336,17 +362,24 @@ function lineupPayload() {
         home_away: state.meta.home_away,
         use_dh: state.meta.use_dh,
         use_eh: state.meta.use_eh,
+        dh_mode: state.meta.dh_mode,
         spots: collectSpots(),
     };
 }
 
 // ---------- Assignment helpers ----------
 function assign(slotId, playerId) {
-    // Remove this player from any other slot.
-    for (const k of Object.keys(state.assignments)) {
-        if (state.assignments[k] == playerId) delete state.assignments[k];
+    if (slotId === "DEF") {
+        // A two-way player can be both a batter and the DEF line, so don't
+        // remove them from the batting order when placing on DEF.
+        state.assignments["DEF"] = playerId;
+    } else {
+        // Remove this player from any other batting spot (but keep DEF).
+        for (const k of Object.keys(state.assignments)) {
+            if (k !== "DEF" && state.assignments[k] == playerId) delete state.assignments[k];
+        }
+        state.assignments[slotId] = playerId;
     }
-    state.assignments[slotId] = playerId;
     // Default the position to the player's default if the slot has none.
     if (!state.positions[slotId]) {
         const p = state.players.find((pl) => pl.id == playerId);
@@ -399,10 +432,10 @@ function renderSpots() {
     const ol = $("lineup-spots");
     ol.innerHTML = "";
     for (const id of slotIds()) {
-        const isSpecial = id === "DH" || id === "EH";
-        const li = el("li", "spot" + (id === "DH" ? " dh" : id === "EH" ? " eh" : ""));
+        const isDef = id === "DEF";
+        const li = el("li", "spot" + (isDef ? " def" : ""));
 
-        const order = el("span", "order", isSpecial ? id : id);
+        const order = el("span", "order", isDef ? "DEF" : id);
         li.appendChild(order);
 
         const slot = el("div", "slot");
@@ -441,20 +474,6 @@ function renderSpots() {
         sel.value = state.positions[id] || "";
         sel.onchange = () => { state.positions[id] = sel.value; renderPreview(); };
         li.appendChild(sel);
-
-        // Two-way DH toggle (high school): this fielder is also the DH.
-        if (!isSpecial) {
-            const dh = el("button", "dhbtn" + (state.twoWayDH[id] ? " on" : ""), "DH");
-            dh.type = "button";
-            dh.title = "High-school two-way player: fields and is the DH (shows as POS/DH)";
-            dh.onclick = () => {
-                const wasOn = !!state.twoWayDH[id];
-                state.twoWayDH = {}; // only one DH per lineup
-                if (!wasOn) state.twoWayDH[id] = true;
-                renderAll();
-            };
-            li.appendChild(dh);
-        }
 
         // Clear button
         const clr = el("button", "clear", "✕");
@@ -531,15 +550,14 @@ function renderPreview() {
         .forEach(([cls, h]) => { const th = el("th", cls, h); thead.appendChild(th); });
     table.appendChild(thead);
     for (const id of slotIds()) {
-        const tr = el("tr");
-        tr.appendChild(el("td", "o", id));
+        const isDef = id === "DEF";
+        const tr = el("tr", isDef ? "cp-def" : null);
+        tr.appendChild(el("td", "o", isDef ? "DEF" : id));
         const pid = state.assignments[id];
         const p = pid != null ? state.players.find((pl) => pl.id == pid) : null;
         tr.appendChild(el("td", "n", p ? (p.number || "") : ""));
         tr.appendChild(el("td", "name", p ? p.name : ""));
-        let posLabel = state.positions[id] || "";
-        if (state.twoWayDH[id]) posLabel = posLabel ? posLabel + "/DH" : "DH";
-        tr.appendChild(el("td", "pos", posLabel));
+        tr.appendChild(el("td", "pos", state.positions[id] || ""));
         // Substitute / Pos / Inn are blank write-in columns.
         tr.appendChild(el("td", "sub", ""));
         tr.appendChild(el("td", "subpos", ""));
@@ -693,8 +711,12 @@ function wireMeta() {
     bind("meta-location", "location");
     bind("meta-homeaway", "home_away");
     bind("meta-name", "name");
-    bind("meta-dh", "use_dh", true);
-    bind("meta-eh", "use_eh", true);
+    $("meta-dhmode").addEventListener("change", () => {
+        state.meta.dh_mode = $("meta-dhmode").value;
+        if (hasDef() && state.positions["DEF"] == null) state.positions["DEF"] = "P";
+        updateDhHint();
+        renderAll();
+    });
 }
 
 // ---------- Lineup actions ----------

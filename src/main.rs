@@ -65,6 +65,15 @@ async fn main() -> anyhow::Result<()> {
             .execute(&pool)
             .await?;
     }
+    let has_dh_mode: Option<(i64,)> =
+        sqlx::query_as("SELECT 1 FROM pragma_table_info('lineups') WHERE name = 'dh_mode'")
+            .fetch_optional(&pool)
+            .await?;
+    if has_dh_mode.is_none() {
+        sqlx::query("ALTER TABLE lineups ADD COLUMN dh_mode TEXT NOT NULL DEFAULT 'straight9'")
+            .execute(&pool)
+            .await?;
+    }
 
     let state = AppState {
         pool,

@@ -126,6 +126,8 @@ label.inline input, label.inline select { margin-top: 0; width: auto; }
 .game-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .game-grid label { margin: 0; }
 .game-grid label.check { display: flex; align-items: center; gap: 6px; align-self: end; padding-bottom: 8px; }
+.game-grid .span2 { grid-column: 1 / -1; }
+.game-grid .hint { margin: -2px 0 0; }
 
 /* ---------- Lineup spots ---------- */
 .lineup-spots { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; counter-reset: none; }
@@ -150,6 +152,8 @@ label.inline input, label.inline select { margin-top: 0; width: auto; }
 .spot .dhbtn:hover { border-color: var(--accent); }
 .spot .clear { border: none; background: none; color: var(--muted); cursor: pointer; font-size: 15px; }
 .spot.dh .order, .spot.eh .order { color: var(--accent); font-size: 12px; }
+.spot.def .order { color: #fff; background: var(--accent); border-radius: 6px; font-size: 11px; padding: 3px 2px; }
+.spot.def .slot.filled { border-color: var(--accent); }
 
 /* ---------- Player pool ---------- */
 .player-pool { display: flex; flex-wrap: wrap; gap: 8px; min-height: 44px; }
@@ -190,6 +194,8 @@ body.selecting .spot .slot:not(.filled) { border-color: var(--accent);
 .cp-table td { font-size: 10px; }
 .cp-table td.n, .cp-table td.o, .cp-table th.n, .cp-table th.o { text-align: center; width: 20px; }
 .cp-table td.o { font-weight: 800; color: var(--red); font-size: 12px; }
+.cp-table tr.cp-def td.o { font-size: 8px; color: var(--accent); }
+.cp-table tr.cp-def td { background: color-mix(in srgb, var(--accent) 7%, #fff); }
 .cp-table td.pos, .cp-table th.pos { font-weight: 700; width: 30px; text-align: center; }
 .cp-table td.subpos, .cp-table td.inn, .cp-table th.subpos, .cp-table th.inn { width: 18px; text-align: center; }
 .cp-table td.sub, .cp-table th.sub { width: 30%; }

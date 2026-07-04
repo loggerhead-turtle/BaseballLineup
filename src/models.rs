@@ -33,6 +33,7 @@ pub struct Lineup {
     pub home_away: String,
     pub use_dh: i64,
     pub use_eh: i64,
+    pub dh_mode: String,
     pub created_at: String,
 }
 
@@ -105,8 +106,14 @@ pub struct LineupPayload {
     pub use_dh: bool,
     #[serde(default)]
     pub use_eh: bool,
+    #[serde(default = "default_dh_mode")]
+    pub dh_mode: String,
     #[serde(default)]
     pub spots: Vec<SpotPayload>,
+}
+
+fn default_dh_mode() -> String {
+    "straight9".to_string()
 }
 
 // ---- Composite responses ----
