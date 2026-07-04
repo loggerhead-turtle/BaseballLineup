@@ -1,32 +1,29 @@
-# Fly.io configuration for the Lineup Card Maker.
+# fly.toml app configuration file generated for baseballlineup on 2026-07-04T01:33:35Z
 #
-# Rename `app` to a globally-unique name, or let `fly launch` set it for you.
-# See DEPLOY.md for full step-by-step instructions.
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
 
-app = "baseball-lineup"
-primary_region = "iad"   # pick one near you: `fly platform regions`
+app = 'baseballlineup'
+primary_region = 'lax'
 
 [build]
 
 [env]
-  BIND_ADDR = "0.0.0.0:8080"
-  DATABASE_URL = "/data/lineup.db"
-  UPLOADS_DIR = "/data/uploads"
+  BIND_ADDR = '0.0.0.0:8080'
+  DATABASE_URL = '/data/lineup.db'
+  UPLOADS_DIR = '/data/uploads'
+
+[[mounts]]
+  source = 'lineup_data'
+  destination = '/data'
 
 [http_service]
   internal_port = 8080
   force_https = true
-  # Scale to zero when idle and cold-start on the next request, to keep cost near $0.
-  auto_stop_machines = "stop"
+  auto_stop_machines = 'stop'
   auto_start_machines = true
   min_machines_running = 0
 
-# Persistent volume for the SQLite database and uploaded team logos.
-# The volume lives in one region and is attached to a single machine.
-[[mounts]]
-  source = "lineup_data"
-  destination = "/data"
-
 [[vm]]
-  size = "shared-cpu-1x"
-  memory = "512mb"   # 256mb also works; 512mb gives headroom for logo/PDF rendering
+  size = 'shared-cpu-1x'
+  memory = '512mb'
