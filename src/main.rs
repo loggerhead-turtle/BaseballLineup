@@ -17,6 +17,9 @@ use tower_http::trace::TraceLayer;
 #[derive(Clone)]
 pub struct AppState {
     pub pool: SqlitePool,
+    /// Filesystem directory where uploaded team logos are stored. On a hosted
+    /// deployment this points at a persistent volume (e.g. /data/uploads).
+    pub uploads_dir: String,
 }
 
 #[tokio::main]
@@ -28,13 +31,20 @@ async fn main() -> anyhow::Result<()> {
         )
         .init();
 
-    // Ensure uploads dir exists.
-    std::fs::create_dir_all("uploads").ok();
+    let uploads_dir = std::env::var("UPLOADS_DIR").unwrap_or_else(|_| "uploads".to_string());
+    std::fs::create_dir_all(&uploads_dir).ok();
+
+    let static_dir = std::env::var("STATIC_DIR").unwrap_or_else(|_| "static".to_string());
 
     let db_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| "lineup.db".to_string());
-    let opts = SqliteConnectOptions::from_str(&db_url)?
-        .create_if_missing(true)
-        .foreign_keys(true);
+    // Accept either a sqlite:// URI or a plain filesystem path.
+    let opts = if db_url.contains("://") {
+        SqliteConnectOptions::from_str(&db_url)?
+    } else {
+        SqliteConnectOptions::new().filename(&db_url)
+    }
+    .create_if_missing(true)
+    .foreign_keys(true);
     let pool = SqlitePoolOptions::new()
         .max_connections(5)
         .connect_with(opts)
@@ -56,7 +66,10 @@ async fn main() -> anyhow::Result<()> {
             .await?;
     }
 
-    let state = AppState { pool };
+    let state = AppState {
+        pool,
+        uploads_dir: uploads_dir.clone(),
+    };
 
     let api = Router::new()
         .route("/signup", post(auth::signup))
@@ -93,8 +106,8 @@ async fn main() -> anyhow::Result<()> {
 
     let app = Router::new()
         .nest("/api", api)
-        .nest_service("/uploads", ServeDir::new("uploads"))
-        .fallback_service(ServeDir::new("static").append_index_html_on_directories(true))
+        .nest_service("/uploads", ServeDir::new(&uploads_dir))
+        .fallback_service(ServeDir::new(&static_dir).append_index_html_on_directories(true))
         .layer(TraceLayer::new_for_http())
         .with_state(state);
 

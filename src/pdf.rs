@@ -74,6 +74,7 @@ pub fn render_sheet(
     spots: &[LineupSpot],
     players: &[Player],
     req: &PdfRequest,
+    uploads_dir: &str,
 ) -> AppResult<Vec<u8>> {
     // Build the ordered list of cards (group large recipients first, umpire last).
     let mut cards: Vec<Card> = Vec::new();
@@ -132,6 +133,7 @@ pub fn render_sheet(
             spots,
             players,
             &player_map,
+            uploads_dir,
         );
     }
 
@@ -278,6 +280,7 @@ fn draw_card(
     spots: &[LineupSpot],
     players: &[Player],
     player_map: &HashMap<i64, &Player>,
+    uploads_dir: &str,
 ) {
     let pad = 2.2;
     let base = variant.base_font();
@@ -296,8 +299,9 @@ fn draw_card(
     let logo_y = header_bottom + pad;
     rect(layer, logo_x, logo_y, logo_size, logo_size, 0.4);
     let mut logo_drawn = false;
-    if let Some(path) = &team.logo_path {
-        let fs_path = format!(".{path}");
+    if let Some(url) = &team.logo_path {
+        let file = url.rsplit('/').next().unwrap_or(url);
+        let fs_path = format!("{uploads_dir}/{file}");
         if place_logo(layer, &fs_path, logo_x + 0.6, logo_y + 0.6, logo_size - 1.2, logo_size - 1.2)
             .is_ok()
         {
@@ -604,7 +608,7 @@ mod tests {
             self_copy: 1,
             umpire: 2,
         };
-        let bytes = render_sheet(&team, &lineup, &spots, &players, &req).expect("render ok");
+        let bytes = render_sheet(&team, &lineup, &spots, &players, &req, "uploads").expect("render ok");
         assert!(bytes.len() > 1000, "pdf should be non-trivial");
         assert_eq!(&bytes[0..5], b"%PDF-", "should start with a PDF header");
     }

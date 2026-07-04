@@ -13,6 +13,13 @@ use crate::AppState;
 
 // ---- ownership helpers ----
 
+/// Map a stored logo URL ("/uploads/<file>") to its path on disk under the
+/// configured uploads directory.
+fn logo_fs_path(uploads_dir: &str, logo_url: &str) -> String {
+    let file = logo_url.rsplit('/').next().unwrap_or(logo_url);
+    format!("{uploads_dir}/{file}")
+}
+
 async fn owned_team(state: &AppState, user_id: i64, team_id: i64) -> AppResult<Team> {
     sqlx::query_as::<_, Team>("SELECT * FROM teams WHERE id = ? AND user_id = ?")
         .bind(team_id)
@@ -122,7 +129,7 @@ pub async fn delete_team(
 ) -> AppResult<Json<serde_json::Value>> {
     let team = owned_team(&state, user.id, id).await?;
     if let Some(path) = &team.logo_path {
-        std::fs::remove_file(format!(".{path}")).ok();
+        std::fs::remove_file(logo_fs_path(&state.uploads_dir, path)).ok();
     }
     sqlx::query("DELETE FROM teams WHERE id = ?")
         .bind(id)
@@ -164,13 +171,13 @@ pub async fn upload_logo(
     rand::rngs::OsRng.fill_bytes(&mut r);
     let suffix: String = r.iter().map(|b| format!("{b:02x}")).collect();
     let filename = format!("team_{id}_{suffix}.{ext}");
-    std::fs::create_dir_all("uploads").ok();
-    std::fs::write(format!("uploads/{filename}"), &data)
+    std::fs::create_dir_all(&state.uploads_dir).ok();
+    std::fs::write(format!("{}/{filename}", state.uploads_dir), &data)
         .map_err(|e| AppError::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     // Remove previous logo file.
     if let Some(old) = &team.logo_path {
-        std::fs::remove_file(format!(".{old}")).ok();
+        std::fs::remove_file(logo_fs_path(&state.uploads_dir, old)).ok();
     }
 
     let logo_path = format!("/uploads/{filename}");
@@ -437,7 +444,7 @@ pub async fn lineup_pdf(
         umpire: q.umpire.min(20),
     };
 
-    let bytes = pdf::render_sheet(&team, &lineup, &spots, &players, &request)?;
+    let bytes = pdf::render_sheet(&team, &lineup, &spots, &players, &request, &state.uploads_dir)?;
 
     let filename = format!(
         "lineup-{}.pdf",

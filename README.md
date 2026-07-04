@@ -43,13 +43,21 @@ cargo run
 
 Environment variables (all optional):
 
-| Variable       | Default          | Purpose                          |
-| -------------- | ---------------- | -------------------------------- |
-| `BIND_ADDR`    | `0.0.0.0:3000`   | Address/port to bind             |
-| `DATABASE_URL` | `lineup.db`      | SQLite file path                 |
-| `RUST_LOG`     | `info`           | Log filter                       |
+| Variable       | Default          | Purpose                                   |
+| -------------- | ---------------- | ----------------------------------------- |
+| `BIND_ADDR`    | `0.0.0.0:3000`   | Address/port to bind                      |
+| `DATABASE_URL` | `lineup.db`      | SQLite URI or plain file path             |
+| `UPLOADS_DIR`  | `uploads`        | Directory for uploaded team logos         |
+| `STATIC_DIR`   | `static`         | Directory for the static front end        |
+| `RUST_LOG`     | `info`           | Log filter                                |
 
-Uploaded logos are stored under `uploads/` and served at `/uploads/...`.
+Uploaded logos are stored under `UPLOADS_DIR` and served at `/uploads/...`.
+
+## Deploying
+
+See [DEPLOY.md](DEPLOY.md) for a step-by-step Fly.io deployment (Docker image +
+persistent volume for the database and logos). A `Dockerfile` and `fly.toml`
+are included.
 
 ## Tests
 
