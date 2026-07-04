@@ -317,6 +317,7 @@ fn draw_card(
     uploads_dir: &str,
 ) {
     let _ = lineup.dh_mode.as_str();
+    let _ = recipient; // cards are unlabeled
     let pad = 2.2;
     let base = variant.base_font();
     let small = base - 2.0;
@@ -373,22 +374,16 @@ fn draw_card(
         logo_w_used = approx_width(&initial, s) + 1.0;
     }
 
-    // Recipient tag (bordered, navy) — reserve room so the team name doesn't run into it.
-    let tag_size = base - 2.0;
-    let tag_w = approx_width(recipient, tag_size) * 1.35;
-    let tag_bx = x + w - pad - tag_w - 3.0;
-    let tag_baseline = top - pad - (base + 2.0) * 0.35;
-    rect(layer, tag_bx, tag_baseline - 1.4, tag_w + 3.0, tag_size * 0.35 + 3.2, 0.5, navy());
-    text(layer, &fonts.bold, recipient, tag_size, tag_bx + 1.6, tag_baseline, navy());
-
+    // Cards are intentionally unlabeled — they're identical apart from size.
+    let name_baseline = top - pad - (base + 2.0) * 0.35;
     let info_x = logo_x + logo_w_used + pad + 1.0;
-    let info_w = tag_bx - pad - info_x;
+    let info_w = x + w - pad - info_x;
     let name = truncate_to(&team.name, base + 2.0, info_w);
-    text(layer, &fonts.bold, &name, base + 2.0, info_x, tag_baseline, navy());
+    text(layer, &fonts.bold, &name, base + 2.0, info_x, name_baseline, navy());
 
     let mut line_y = top - pad - (base + 2.0) * 0.35 - (base * 0.5) - 1.6;
     if !lineup.opponent.is_empty() {
-        let vs = truncate_to(&format!("vs {}", lineup.opponent), base, info_w + tag_w);
+        let vs = truncate_to(&format!("vs {}", lineup.opponent), base, info_w);
         text(layer, &fonts.regular, &vs, base, info_x, line_y, ink());
         line_y -= base * 0.5 + 1.4;
     }
@@ -403,7 +398,7 @@ fn draw_card(
         meta_bits.push(lineup.location.clone());
     }
     if !meta_bits.is_empty() {
-        let meta = truncate_to(&meta_bits.join("  •  "), base - 1.5, info_w + tag_w);
+        let meta = truncate_to(&meta_bits.join("  •  "), base - 1.5, info_w);
         text(layer, &fonts.regular, &meta, base - 1.5, info_x, line_y, muted());
     }
 
