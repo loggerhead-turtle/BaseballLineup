@@ -424,7 +424,8 @@ function renderPreview() {
 
     const table = el("table", "cp-table");
     const thead = el("tr");
-    ["#", "No", "Player", "Pos"].forEach((h) => thead.appendChild(el("th", null, h)));
+    [["o","Ord"],["n","#"],["name","Starter"],["pos","Pos"],["sub","Substitute"],["subpos","Pos"],["inn","Inn"]]
+        .forEach(([cls, h]) => { const th = el("th", cls, h); thead.appendChild(th); });
     table.appendChild(thead);
     for (const id of slotIds()) {
         const tr = el("tr");
@@ -436,15 +437,19 @@ function renderPreview() {
         let posLabel = state.positions[id] || "";
         if (state.twoWayDH[id]) posLabel = posLabel ? posLabel + "/DH" : "DH";
         tr.appendChild(el("td", "pos", posLabel));
+        // Substitute / Pos / Inn are blank write-in columns.
+        tr.appendChild(el("td", "sub", ""));
+        tr.appendChild(el("td", "subpos", ""));
+        tr.appendChild(el("td", "inn", ""));
         table.appendChild(tr);
     }
     box.appendChild(table);
 
-    // Substitutes: every roster player not in the batting order.
+    // Player available: every roster player not in the batting order.
     const placed = placedPlayerIds();
     const subs = state.players.filter((p) => !placed.has(p.id));
     const subWrap = el("div", "cp-subs");
-    subWrap.appendChild(el("div", "cp-subs-h", "SUBSTITUTES"));
+    subWrap.appendChild(el("div", "cp-subs-h", "Player Available"));
     const subGrid = el("div", "cp-subs-grid");
     if (subs.length === 0) {
         subGrid.appendChild(el("span", "cp-sub-none", "None"));
