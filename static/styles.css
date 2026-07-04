@@ -201,6 +201,10 @@ body.selecting .spot .slot:not(.filled) { border-color: var(--accent);
 .cp-table td.sub, .cp-table th.sub { width: 30%; }
 .cp-table td.sub, .cp-table td.subpos, .cp-table td.inn,
 .cp-table th.sub, .cp-table th.subpos, .cp-table th.inn { border-left: 1px solid var(--line); }
+/* Mid-row divider so two substitutes can be recorded per batting spot. */
+.cp-table td.sub, .cp-table td.subpos, .cp-table td.inn {
+    background: linear-gradient(to bottom, transparent calc(50% - 0.5px), var(--line) 50%, transparent calc(50% + 0.5px));
+}
 .cp-table td.name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cp-subs { border-top: 1.5px solid var(--ink); margin-top: 8px; padding-top: 6px; }
 .cp-subs-h { font-size: 9px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 800; margin-bottom: 4px; }

@@ -546,7 +546,7 @@ function renderPreview() {
 
     const table = el("table", "cp-table");
     const thead = el("tr");
-    [["o","Ord"],["n","#"],["name","Starter"],["pos","Pos"],["sub","Substitute"],["subpos","Pos"],["inn","Inn"]]
+    [["o",""],["n","#"],["name","Starter"],["pos","Pos"],["sub","Substitute"],["subpos","Pos"],["inn","Inn"]]
         .forEach(([cls, h]) => { const th = el("th", cls, h); thead.appendChild(th); });
     table.appendChild(thead);
     for (const id of slotIds()) {

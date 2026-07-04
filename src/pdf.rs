@@ -433,7 +433,8 @@ fn draw_card(
     let hs = small - 1.0;
     let col_hdr_h = small + 2.5;
     let hdr_base = table_top - col_hdr_h + (col_hdr_h - hs * 0.35) / 2.0;
-    text(layer, &fonts.bold, "ORDER", hs, center_x("ORDER", hs, cx_order, w_order), hdr_base);
+    // (No "ORDER" header — the batting numbers speak for themselves and the
+    // label crowded the # column.)
     text(layer, &fonts.bold, "#", hs, center_x("#", hs, cx_num, w_num), hdr_base);
     text(layer, &fonts.bold, "STARTER", hs, cx_start + 1.0, hdr_base);
     text(layer, &fonts.bold, "POS", hs, center_x("POS", hs, cx_pos, w_pos), hdr_base);
@@ -453,6 +454,9 @@ fn draw_card(
         if i > 0 {
             hline(layer, x, x + w, row_top, 0.2);
         }
+        // Split the substitute area (SUBSTITUTE | POS | INN) so two substitutes
+        // can be recorded per batting spot.
+        hline(layer, cx_sub, x + w, row_bottom + row_h / 2.0, 0.15);
         if i >= spots.len() {
             continue;
         }
