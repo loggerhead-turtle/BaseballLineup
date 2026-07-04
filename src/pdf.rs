@@ -18,6 +18,32 @@ fn mm(v: f64) -> Mm {
     Mm(v as f32)
 }
 
+// --- palette (mirrors the on-screen preview) ---
+fn rgb(r: u8, g: u8, b: u8) -> Color {
+    Color::Rgb(Rgb::new(r as f32 / 255.0, g as f32 / 255.0, b as f32 / 255.0, None))
+}
+fn ink() -> Color {
+    rgb(20, 33, 58)
+}
+fn navy() -> Color {
+    rgb(11, 37, 69)
+}
+fn red() -> Color {
+    rgb(179, 32, 46)
+}
+fn muted() -> Color {
+    rgb(90, 102, 117)
+}
+fn green() -> Color {
+    rgb(31, 122, 77)
+}
+fn grid() -> Color {
+    rgb(201, 207, 216)
+}
+fn green_tint() -> Color {
+    rgb(236, 246, 240)
+}
+
 #[derive(Clone, Copy, PartialEq)]
 enum Variant {
     Large,
@@ -174,15 +200,15 @@ fn pack(cards: &[Card]) -> Vec<Placement> {
     out
 }
 
-// --- primitive drawing helpers ---
+// --- primitive drawing helpers (all take an explicit color) ---
 
-fn set_stroke(layer: &PdfLayerReference, thickness: f64) {
+fn stroke(layer: &PdfLayerReference, thickness: f64, color: Color) {
     layer.set_outline_thickness(thickness as f32);
-    layer.set_outline_color(Color::Rgb(Rgb::new(0.0, 0.0, 0.0, None)));
+    layer.set_outline_color(color);
 }
 
-fn rect(layer: &PdfLayerReference, x: f64, y: f64, w: f64, h: f64, thickness: f64) {
-    set_stroke(layer, thickness);
+fn rect(layer: &PdfLayerReference, x: f64, y: f64, w: f64, h: f64, thickness: f64, color: Color) {
+    stroke(layer, thickness, color);
     let points = vec![
         (Point::new(mm(x), mm(y)), false),
         (Point::new(mm(x + w), mm(y)), false),
@@ -195,8 +221,23 @@ fn rect(layer: &PdfLayerReference, x: f64, y: f64, w: f64, h: f64, thickness: f6
     });
 }
 
-fn hline(layer: &PdfLayerReference, x1: f64, x2: f64, y: f64, thickness: f64) {
-    set_stroke(layer, thickness);
+fn fill_rect(layer: &PdfLayerReference, x: f64, y: f64, w: f64, h: f64, color: Color) {
+    layer.set_fill_color(color);
+    let ring = vec![
+        (Point::new(mm(x), mm(y)), false),
+        (Point::new(mm(x + w), mm(y)), false),
+        (Point::new(mm(x + w), mm(y + h)), false),
+        (Point::new(mm(x), mm(y + h)), false),
+    ];
+    layer.add_polygon(Polygon {
+        rings: vec![ring],
+        mode: PolygonMode::Fill,
+        ..Default::default()
+    });
+}
+
+fn hline(layer: &PdfLayerReference, x1: f64, x2: f64, y: f64, thickness: f64, color: Color) {
+    stroke(layer, thickness, color);
     let points = vec![
         (Point::new(mm(x1), mm(y)), false),
         (Point::new(mm(x2), mm(y)), false),
@@ -207,8 +248,8 @@ fn hline(layer: &PdfLayerReference, x1: f64, x2: f64, y: f64, thickness: f64) {
     });
 }
 
-fn vline(layer: &PdfLayerReference, x: f64, y1: f64, y2: f64, thickness: f64) {
-    set_stroke(layer, thickness);
+fn vline(layer: &PdfLayerReference, x: f64, y1: f64, y2: f64, thickness: f64, color: Color) {
+    stroke(layer, thickness, color);
     let points = vec![
         (Point::new(mm(x), mm(y1)), false),
         (Point::new(mm(x), mm(y2)), false),
@@ -219,7 +260,16 @@ fn vline(layer: &PdfLayerReference, x: f64, y1: f64, y2: f64, thickness: f64) {
     });
 }
 
-fn text(layer: &PdfLayerReference, font: &IndirectFontRef, s: &str, size: f64, x: f64, baseline_y: f64) {
+fn text(
+    layer: &PdfLayerReference,
+    font: &IndirectFontRef,
+    s: &str,
+    size: f64,
+    x: f64,
+    baseline_y: f64,
+    color: Color,
+) {
+    layer.set_fill_color(color);
     layer.use_text(s, size as f32, mm(x), mm(baseline_y), font);
 }
 
@@ -266,7 +316,7 @@ fn draw_card(
     player_map: &HashMap<i64, &Player>,
     uploads_dir: &str,
 ) {
-    let _ = lineup.dh_mode.as_str(); // mode is reflected in the spots themselves
+    let _ = lineup.dh_mode.as_str();
     let pad = 2.2;
     let base = variant.base_font();
     let small = base - 2.0;
@@ -276,7 +326,6 @@ fn draw_card(
     let iw = ir - il;
 
     // Column geometry — shared so the batting grid and the available grid line up.
-    // ORDER | # | STARTER | POS | SUBSTITUTE | POS | INN
     let w_order = iw * 0.085;
     let w_num = iw * 0.075;
     let w_pos = iw * 0.095;
@@ -293,9 +342,9 @@ fn draw_card(
     let cx_subpos = cx_sub + w_sub;
     let cx_inn = cx_subpos + w_subpos;
 
-    rect(layer, x, y, w, h, 0.7);
+    rect(layer, x, y, w, h, 0.8, ink());
 
-    // ---- Header: logo (no border) + team / opponent / date ----
+    // ---- Header ----
     let header_h = if variant == Variant::Large { 22.0 } else { 18.0 };
     let header_bottom = top - header_h;
 
@@ -320,19 +369,27 @@ fn draw_card(
             .map(|c| c.to_uppercase().to_string())
             .unwrap_or_default();
         let s = base + 6.0;
-        text(layer, &fonts.bold, &initial, s, logo_x, logo_y + (logo_h - s * 0.35) / 2.0);
+        text(layer, &fonts.bold, &initial, s, logo_x, logo_y + (logo_h - s * 0.35) / 2.0, navy());
         logo_w_used = approx_width(&initial, s) + 1.0;
     }
 
+    // Recipient tag (bordered, navy) — reserve room so the team name doesn't run into it.
+    let tag_size = base - 2.0;
+    let tag_w = approx_width(recipient, tag_size) * 1.35;
+    let tag_bx = x + w - pad - tag_w - 3.0;
+    let tag_baseline = top - pad - (base + 2.0) * 0.35;
+    rect(layer, tag_bx, tag_baseline - 1.4, tag_w + 3.0, tag_size * 0.35 + 3.2, 0.5, navy());
+    text(layer, &fonts.bold, recipient, tag_size, tag_bx + 1.6, tag_baseline, navy());
+
     let info_x = logo_x + logo_w_used + pad + 1.0;
-    let info_w = x + w - pad - info_x;
+    let info_w = tag_bx - pad - info_x;
     let name = truncate_to(&team.name, base + 2.0, info_w);
-    text(layer, &fonts.bold, &name, base + 2.0, info_x, top - pad - (base + 2.0) * 0.35);
+    text(layer, &fonts.bold, &name, base + 2.0, info_x, tag_baseline, navy());
 
     let mut line_y = top - pad - (base + 2.0) * 0.35 - (base * 0.5) - 1.6;
     if !lineup.opponent.is_empty() {
-        let vs = truncate_to(&format!("vs {}", lineup.opponent), base, info_w);
-        text(layer, &fonts.regular, &vs, base, info_x, line_y);
+        let vs = truncate_to(&format!("vs {}", lineup.opponent), base, info_w + tag_w);
+        text(layer, &fonts.regular, &vs, base, info_x, line_y, ink());
         line_y -= base * 0.5 + 1.4;
     }
     let mut meta_bits: Vec<String> = Vec::new();
@@ -346,33 +403,28 @@ fn draw_card(
         meta_bits.push(lineup.location.clone());
     }
     if !meta_bits.is_empty() {
-        let meta = truncate_to(&meta_bits.join("  •  "), base - 1.5, info_w);
-        text(layer, &fonts.regular, &meta, base - 1.5, info_x, line_y);
+        let meta = truncate_to(&meta_bits.join("  •  "), base - 1.5, info_w + tag_w);
+        text(layer, &fonts.regular, &meta, base - 1.5, info_x, line_y, muted());
     }
 
-    let tag_size = base - 2.0;
-    let tag_w = approx_width(recipient, tag_size) * 1.32;
-    let tag_x = (x + w - pad - tag_w).max(info_x);
-    text(layer, &fonts.bold, recipient, tag_size, tag_x, top - pad - (base + 2.0) * 0.35);
+    hline(layer, x, x + w, header_bottom, 0.7, ink());
 
-    hline(layer, x, x + w, header_bottom, 0.6);
-
-    // ---- Footer: coaches only ----
+    // ---- Footer: coaches ----
     let footer_h = if variant == Variant::Large { 13.0 } else { 11.0 };
     let footer_top = y + footer_h;
-    hline(layer, x, x + w, footer_top, 0.6);
+    hline(layer, x, x + w, footer_top, 0.6, ink());
     let mut fy = footer_top - 3.0 - small * 0.35;
     if !team.head_coach.is_empty() {
         let s = truncate_to(&format!("Head Coach: {}", team.head_coach), small, w - 2.0 * pad);
-        text(layer, &fonts.regular, &s, small, x + pad, fy);
+        text(layer, &fonts.regular, &s, small, x + pad, fy, ink());
         fy -= small * 0.5 + 1.8;
     }
     if !team.assistant_coaches.is_empty() {
         let s = truncate_to(&format!("Assistants: {}", team.assistant_coaches), small, w - 2.0 * pad);
-        text(layer, &fonts.regular, &s, small, x + pad, fy);
+        text(layer, &fonts.regular, &s, small, x + pad, fy, ink());
     }
 
-    // ---- Available players (bench) — a clean grid with row lines ----
+    // ---- Available players (bench) ----
     let assigned: Vec<i64> = spots.iter().filter_map(|s| s.player_id).collect();
     let subs: Vec<&Player> = players.iter().filter(|p| !assigned.contains(&p.id)).collect();
 
@@ -383,80 +435,83 @@ fn draw_card(
     let av_rows = left_count.max(3);
     let avail_h = av_head + av_rows as f64 * av_line + 1.5;
     let avail_top = footer_top + avail_h;
-    hline(layer, x, x + w, avail_top, 0.6);
+    hline(layer, x, x + w, avail_top, 0.6, ink());
 
-    // Two halves; vertical dividers align with the batting grid (cx_num, cx_sub).
     let num_w = cx_num - il;
     let center = cx_sub;
     let av_rows_top = avail_top - av_head;
     let av_hb = av_rows_top + (av_head - av_size * 0.35) / 2.0;
     for &(numx, namex, nameend) in &[(il, cx_num, center), (center, center + num_w, ir)] {
-        text(layer, &fonts.bold, "#", av_size, numx + 0.8, av_hb);
+        text(layer, &fonts.bold, "#", av_size, numx + 0.8, av_hb, muted());
         let title = truncate_to("PLAYER AVAILABLE", av_size - 0.5, nameend - namex - 1.5);
-        text(layer, &fonts.bold, &title, av_size - 0.5, namex + 1.2, av_hb);
+        text(layer, &fonts.bold, &title, av_size - 0.5, namex + 1.2, av_hb, muted());
     }
-    vline(layer, cx_num, footer_top, avail_top, 0.3);
-    vline(layer, center, footer_top, avail_top, 0.3);
-    vline(layer, center + num_w, footer_top, avail_top, 0.3);
-    hline(layer, x, x + w, av_rows_top, 0.4);
+    vline(layer, cx_num, footer_top, avail_top, 0.25, grid());
+    vline(layer, center, footer_top, avail_top, 0.25, grid());
+    vline(layer, center + num_w, footer_top, avail_top, 0.25, grid());
+    hline(layer, x, x + w, av_rows_top, 0.4, ink());
 
     for r in 0..av_rows {
         let row_top = av_rows_top - r as f64 * av_line;
         if r > 0 {
-            hline(layer, x, x + w, row_top, 0.3);
+            hline(layer, x, x + w, row_top, 0.25, grid());
         }
         let baseline = row_top - av_line + (av_line - av_size * 0.35) / 2.0;
-        // Left column only holds the first `left_count` subs; the rest are the
-        // right column. (Extra rows past the data stay blank for write-ins.)
         if r < left_count {
             if let Some(p) = subs.get(r) {
-                text(layer, &fonts.bold, &p.number, av_size, il + 1.0, baseline);
+                text(layer, &fonts.bold, &p.number, av_size, il + 1.0, baseline, red());
                 let nm = truncate_to(&p.name, av_size, center - cx_num - 2.0);
-                text(layer, &fonts.regular, &nm, av_size, cx_num + 1.2, baseline);
+                text(layer, &fonts.regular, &nm, av_size, cx_num + 1.2, baseline, ink());
             }
         }
         if let Some(p) = subs.get(left_count + r) {
-            text(layer, &fonts.bold, &p.number, av_size, center + 1.0, baseline);
+            text(layer, &fonts.bold, &p.number, av_size, center + 1.0, baseline, red());
             let nm = truncate_to(&p.name, av_size, ir - (center + num_w) - 2.0);
-            text(layer, &fonts.regular, &nm, av_size, center + num_w + 1.2, baseline);
+            text(layer, &fonts.regular, &nm, av_size, center + num_w + 1.2, baseline, ink());
         }
     }
 
     // ---- Main lineup table ----
     let table_top = header_bottom;
     let table_bottom = avail_top;
+    let col_hdr_h = small + 2.5;
+    let data_top = table_top - col_hdr_h;
+    let n_data = spots.len() + 1;
+    let row_h = (data_top - table_bottom) / n_data as f64;
 
-    for &vx in &[cx_num, cx_start, cx_pos, cx_sub, cx_subpos, cx_inn] {
-        vline(layer, vx, table_bottom, table_top, 0.3);
+    // Tint DEF rows first (under the grid + text).
+    for (i, spot) in spots.iter().enumerate() {
+        if spot.slot_kind == "DEF" {
+            let row_top = data_top - i as f64 * row_h;
+            fill_rect(layer, x + 0.4, row_top - row_h, w - 0.8, row_h, green_tint());
+        }
     }
 
-    let hs = small - 1.0;
-    let col_hdr_h = small + 2.5;
-    let hdr_base = table_top - col_hdr_h + (col_hdr_h - hs * 0.35) / 2.0;
-    // (No "ORDER" header — the batting numbers speak for themselves and the
-    // label crowded the # column.)
-    text(layer, &fonts.bold, "#", hs, center_x("#", hs, cx_num, w_num), hdr_base);
-    text(layer, &fonts.bold, "STARTER", hs, cx_start + 1.0, hdr_base);
-    text(layer, &fonts.bold, "POS", hs, center_x("POS", hs, cx_pos, w_pos), hdr_base);
-    text(layer, &fonts.bold, "SUBSTITUTE", hs, cx_sub + 1.0, hdr_base);
-    text(layer, &fonts.bold, "POS", hs, center_x("POS", hs, cx_subpos, w_subpos), hdr_base);
-    text(layer, &fonts.bold, "INN", hs, center_x("INN", hs, cx_inn, w_inn), hdr_base);
-    hline(layer, x, x + w, table_top - col_hdr_h, 0.4);
+    // Vertical separators.
+    for &vx in &[cx_num, cx_start, cx_pos, cx_sub, cx_subpos, cx_inn] {
+        vline(layer, vx, table_bottom, table_top, 0.25, grid());
+    }
 
-    // Rows: every batting/def spot, plus one blank write-in row.
-    let n_data = spots.len() + 1;
-    let data_top = table_top - col_hdr_h;
-    let row_h = (data_top - table_bottom) / n_data as f64;
+    // Column header row.
+    let hs = small - 1.0;
+    let hdr_base = table_top - col_hdr_h + (col_hdr_h - hs * 0.35) / 2.0;
+    text(layer, &fonts.bold, "#", hs, center_x("#", hs, cx_num, w_num), hdr_base, muted());
+    text(layer, &fonts.bold, "STARTER", hs, cx_start + 1.0, hdr_base, muted());
+    text(layer, &fonts.bold, "POS", hs, center_x("POS", hs, cx_pos, w_pos), hdr_base, muted());
+    text(layer, &fonts.bold, "SUBSTITUTE", hs, cx_sub + 1.0, hdr_base, muted());
+    text(layer, &fonts.bold, "POS", hs, center_x("POS", hs, cx_subpos, w_subpos), hdr_base, muted());
+    text(layer, &fonts.bold, "INN", hs, center_x("INN", hs, cx_inn, w_inn), hdr_base, muted());
+    hline(layer, x, x + w, table_top - col_hdr_h, 0.5, ink());
+
     let cell_size = small - 0.5;
     for i in 0..n_data {
         let row_top = data_top - i as f64 * row_h;
         let row_bottom = row_top - row_h;
         if i > 0 {
-            hline(layer, x, x + w, row_top, 0.2);
+            hline(layer, x, x + w, row_top, 0.25, grid());
         }
-        // Split the substitute area (SUBSTITUTE | POS | INN) so two substitutes
-        // can be recorded per batting spot.
-        hline(layer, cx_sub, x + w, row_bottom + row_h / 2.0, 0.15);
+        // Split the substitute area so two substitutes can be recorded per spot.
+        hline(layer, cx_sub, x + w, row_bottom + row_h / 2.0, 0.18, grid());
         if i >= spots.len() {
             continue;
         }
@@ -464,8 +519,6 @@ fn draw_card(
         let baseline = row_bottom + (row_h - cell_size * 0.35) / 2.0;
         let is_def = spot.slot_kind == "DEF";
 
-        // ORDER column: big numeral for batters; "DEF" (no number) for the
-        // defensive-only line used with a DH.
         if is_def {
             text(
                 layer,
@@ -474,6 +527,7 @@ fn draw_card(
                 small - 1.0,
                 center_x("DEF", small - 1.0, cx_order, w_order),
                 baseline,
+                green(),
             );
         } else {
             let order_label = match spot.slot_kind.as_str() {
@@ -489,6 +543,7 @@ fn draw_card(
                 ord_size,
                 center_x(&order_label, ord_size, cx_order, w_order),
                 ord_base,
+                red(),
             );
         }
 
@@ -496,11 +551,12 @@ fn draw_card(
             Some(p) => (p.number.clone(), p.name.clone()),
             None => (String::new(), String::new()),
         };
-        text(layer, &fonts.regular, &num, cell_size, cx_num + 1.0, baseline);
+        text(layer, &fonts.bold, &num, cell_size, cx_num + 1.0, baseline, ink());
         let pname = truncate_to(&pname, cell_size, w_start - 2.0);
-        text(layer, &fonts.regular, &pname, cell_size, cx_start + 1.0, baseline);
+        text(layer, &fonts.regular, &pname, cell_size, cx_start + 1.0, baseline, ink());
         let pos_label = truncate_to(&spot.position, cell_size, w_pos - 1.0);
-        text(layer, &fonts.bold, &pos_label, cell_size, cx_pos + 1.0, baseline);
+        let pos_color = if is_def { green() } else { ink() };
+        text(layer, &fonts.bold, &pos_label, cell_size, cx_pos + 1.0, baseline, pos_color);
     }
 }
 
