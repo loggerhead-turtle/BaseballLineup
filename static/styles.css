@@ -138,7 +138,7 @@ label.inline input, label.inline select { margin-top: 0; width: auto; }
     flex: 1; min-width: 0; min-height: 34px; border: 1px dashed var(--line); border-radius: 6px;
     display: flex; align-items: center; gap: 8px; padding: 4px 8px; background: #fff;
 }
-.spot .slot.filled { border-style: solid; border-color: var(--navy); cursor: grab; }
+.spot .slot.filled { border-style: solid; border-color: var(--navy); cursor: grab; user-select: none; -webkit-user-select: none; }
 .spot .slot.dragover { background: #e7f0ff; border-color: var(--navy); }
 .spot .slot .snum { font-weight: 700; color: var(--navy); }
 .spot .slot .sname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -156,7 +156,17 @@ label.inline input, label.inline select { margin-top: 0; width: auto; }
 .chip {
     display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px;
     border: 1px solid var(--navy); border-radius: 999px; background: #fff; cursor: grab; font-size: 13px;
+    user-select: none; -webkit-user-select: none;
 }
+.chip.selected { outline: 3px solid var(--accent); outline-offset: 1px;
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent); }
+/* Floating copy that follows the pointer/finger while dragging. */
+.drag-clone { position: fixed; z-index: 9999; pointer-events: none; opacity: .93; margin: 0 !important;
+    box-shadow: 0 8px 20px rgba(0,0,0,.3); }
+.dragging-src { opacity: .4; }
+body.selecting .spot .slot:not(.filled) { border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 10%, #fff); }
+.hint.active { color: var(--accent); font-weight: 700; }
 .chip .cnum { font-weight: 700; color: var(--navy); }
 .chip.placed { opacity: .5; border-color: var(--strike); cursor: default; }
 .chip.placed .cname, .chip.placed .cnum { text-decoration: line-through; color: var(--strike); }

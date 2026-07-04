@@ -49,6 +49,107 @@ function setStatus(msg, isError) {
     if (msg) setTimeout(() => { if (s.textContent === msg) s.textContent = ""; }, 4000);
 }
 
+// ---------- Drag & tap-to-place (works with mouse AND touch) ----------
+// Native HTML5 drag-and-drop does not fire from touch, so we implement dragging
+// with Pointer Events and also support tap-to-place: tap a player, tap a spot.
+let selectedPlayerId = null;
+const drag = { active: false, moved: false, playerId: null, srcEl: null, clone: null, startX: 0, startY: 0, w: 0, h: 0 };
+let dragJustEnded = false;
+
+function makeDragSource(elm, playerId) {
+    elm.style.touchAction = "none";
+    elm.addEventListener("pointerdown", (e) => {
+        if (e.pointerType === "mouse" && e.button !== 0) return;
+        drag.active = true; drag.moved = false; drag.playerId = playerId; drag.srcEl = elm;
+        drag.startX = e.clientX; drag.startY = e.clientY;
+        window.addEventListener("pointermove", onDragMove);
+        window.addEventListener("pointerup", onDragEnd);
+        window.addEventListener("pointercancel", onDragEnd);
+    });
+}
+
+function onDragMove(e) {
+    if (!drag.active) return;
+    const dx = e.clientX - drag.startX, dy = e.clientY - drag.startY;
+    if (!drag.moved && Math.hypot(dx, dy) > 6) {
+        drag.moved = true;
+        const r = drag.srcEl.getBoundingClientRect();
+        drag.w = r.width; drag.h = r.height;
+        const c = drag.srcEl.cloneNode(true);
+        c.classList.add("drag-clone");
+        c.style.width = r.width + "px";
+        document.body.appendChild(c);
+        drag.clone = c;
+        drag.srcEl.classList.add("dragging-src");
+    }
+    if (drag.moved) {
+        e.preventDefault();
+        if (drag.clone) {
+            drag.clone.style.left = (e.clientX - drag.w / 2) + "px";
+            drag.clone.style.top = (e.clientY - drag.h / 2) + "px";
+        }
+        highlightUnder(e.clientX, e.clientY);
+    }
+}
+
+function onDragEnd(e) {
+    window.removeEventListener("pointermove", onDragMove);
+    window.removeEventListener("pointerup", onDragEnd);
+    window.removeEventListener("pointercancel", onDragEnd);
+    const wasDrag = drag.moved, pid = drag.playerId, cancelled = e.type === "pointercancel";
+    if (drag.clone) { drag.clone.remove(); drag.clone = null; }
+    if (drag.srcEl) drag.srcEl.classList.remove("dragging-src");
+    clearDropHighlights();
+    drag.active = false; drag.moved = false; drag.playerId = null; drag.srcEl = null;
+    if (wasDrag && pid != null && !cancelled) {
+        const t = dropTargetUnder(e.clientX, e.clientY);
+        if (t === "pool") removeFromLineup(pid);
+        else if (t) assign(t, pid);
+        selectedPlayerId = null;
+        dragJustEnded = true;
+        setTimeout(() => { dragJustEnded = false; }, 350);
+        renderAll();
+    }
+}
+
+function elUnder(x, y, sel) { const e = document.elementFromPoint(x, y); return e ? e.closest(sel) : null; }
+function dropTargetUnder(x, y) {
+    const slot = elUnder(x, y, ".slot"); if (slot) return slot.dataset.slot;
+    if (elUnder(x, y, "#player-pool")) return "pool";
+    return null;
+}
+function highlightUnder(x, y) {
+    clearDropHighlights();
+    const slot = elUnder(x, y, ".slot");
+    if (slot) slot.classList.add("dragover");
+    else { const p = elUnder(x, y, "#player-pool"); if (p) p.classList.add("dragover"); }
+}
+function clearDropHighlights() {
+    document.querySelectorAll(".slot.dragover, #player-pool.dragover").forEach((e) => e.classList.remove("dragover"));
+}
+function removeFromLineup(pid) {
+    for (const k of Object.keys(state.assignments)) {
+        if (state.assignments[k] == pid) delete state.assignments[k];
+    }
+    renderAll();
+}
+function selectPlayer(pid) {
+    selectedPlayerId = (selectedPlayerId === pid) ? null : pid;
+    renderAll();
+}
+function updateSelectHint() {
+    const hint = $("dnd-hint");
+    if (!hint) return;
+    if (selectedPlayerId != null) {
+        const p = state.players.find((x) => x.id === selectedPlayerId);
+        hint.textContent = p ? `Tap a spot to place #${p.number || "—"} ${p.name}` : "";
+        hint.classList.add("active");
+    } else {
+        hint.textContent = "Drag a player into a spot — or tap a player, then tap a spot";
+        hint.classList.remove("active");
+    }
+}
+
 // ---------- Auth ----------
 let authMode = "login";
 
@@ -268,6 +369,8 @@ function renderAll() {
     renderSpots();
     renderPool();
     renderPreview();
+    updateSelectHint();
+    document.body.classList.toggle("selecting", selectedPlayerId != null);
 }
 
 function renderRoster() {
@@ -308,23 +411,22 @@ function renderSpots() {
         if (pid != null) {
             const p = state.players.find((pl) => pl.id == pid);
             slot.classList.add("filled");
-            slot.draggable = true;
             slot.appendChild(el("span", "snum", p ? (p.number || "—") : "?"));
             slot.appendChild(el("span", "sname", p ? p.name : "(removed player)"));
-            slot.addEventListener("dragstart", (e) => {
-                e.dataTransfer.setData("text/plain", String(pid));
-                e.dataTransfer.effectAllowed = "move";
-            });
+            makeDragSource(slot, pid); // drag a placed player out / to another spot
         } else {
-            slot.appendChild(el("span", "placeholder", "Drop player here"));
+            slot.appendChild(el("span", "placeholder", "Tap or drag a player here"));
         }
-        slot.addEventListener("dragover", (e) => { e.preventDefault(); slot.classList.add("dragover"); });
-        slot.addEventListener("dragleave", () => slot.classList.remove("dragover"));
-        slot.addEventListener("drop", (e) => {
-            e.preventDefault();
-            slot.classList.remove("dragover");
-            const playerId = parseInt(e.dataTransfer.getData("text/plain"), 10);
-            if (!isNaN(playerId)) assign(id, playerId);
+        // Tap-to-place: a tap on a spot places the currently selected player.
+        slot.addEventListener("click", () => {
+            if (dragJustEnded) return;
+            if (selectedPlayerId != null) {
+                const s = selectedPlayerId;
+                selectedPlayerId = null;
+                assign(id, s);
+            } else if (pid != null) {
+                selectPlayer(pid); // tap a filled spot to pick that player up
+            }
         });
         li.appendChild(slot);
 
@@ -373,30 +475,31 @@ function renderPool() {
         return;
     }
     for (const p of state.players) {
-        const chip = el("div", "chip" + (placed.has(p.id) ? " placed" : ""));
+        const isPlaced = placed.has(p.id);
+        const chip = el("div", "chip" + (isPlaced ? " placed" : "") + (selectedPlayerId === p.id ? " selected" : ""));
         chip.appendChild(el("span", "cnum", p.number || "—"));
         chip.appendChild(el("span", "cname", p.name));
-        if (!placed.has(p.id)) {
-            chip.draggable = true;
-            chip.addEventListener("dragstart", (e) => {
-                e.dataTransfer.setData("text/plain", String(p.id));
-                e.dataTransfer.effectAllowed = "move";
+        if (!isPlaced) {
+            makeDragSource(chip, p.id);
+            chip.addEventListener("click", () => {
+                if (dragJustEnded) return;
+                selectPlayer(p.id); // tap to select, tap again to deselect
             });
         }
         pool.appendChild(chip);
     }
-    // Pool is a drop target that removes a player from the lineup.
-    pool.addEventListener("dragover", (e) => { e.preventDefault(); pool.classList.add("dragover"); });
-    pool.addEventListener("dragleave", () => pool.classList.remove("dragover"));
-    pool.addEventListener("drop", (e) => {
-        e.preventDefault();
-        pool.classList.remove("dragover");
-        const playerId = parseInt(e.dataTransfer.getData("text/plain"), 10);
-        for (const k of Object.keys(state.assignments)) {
-            if (state.assignments[k] == playerId) delete state.assignments[k];
-        }
-        renderAll();
-    });
+    // Tapping the empty pool area returns the selected player (or cancels).
+    // Wire once — the pool element persists across re-renders.
+    if (!pool.dataset.wired) {
+        pool.dataset.wired = "1";
+        pool.addEventListener("click", (e) => {
+            if (dragJustEnded || e.target !== pool || selectedPlayerId == null) return;
+            const inLineup = Object.values(state.assignments).some((v) => v == selectedPlayerId);
+            if (inLineup) removeFromLineup(selectedPlayerId);
+            selectedPlayerId = null;
+            renderAll();
+        });
+    }
 }
 
 function renderPreview() {
