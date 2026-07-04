@@ -144,6 +144,10 @@ label.inline input, label.inline select { margin-top: 0; width: auto; }
 .spot .slot .sname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .spot .slot .placeholder { color: var(--muted); font-size: 13px; }
 .spot select.pos { width: 74px; margin: 0; }
+.spot .dhbtn { border: 1px solid var(--line); background: #fff; color: var(--muted); border-radius: 6px;
+    font-size: 11px; font-weight: 800; padding: 6px 7px; cursor: pointer; letter-spacing: .03em; }
+.spot .dhbtn.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+.spot .dhbtn:hover { border-color: var(--accent); }
 .spot .clear { border: none; background: none; color: var(--muted); cursor: pointer; font-size: 15px; }
 .spot.dh .order, .spot.eh .order { color: var(--accent); font-size: 12px; }
 
@@ -176,6 +180,12 @@ label.inline input, label.inline select { margin-top: 0; width: auto; }
 .cp-table td.n, .cp-table td.o { text-align: center; width: 26px; }
 .cp-table td.o { font-weight: 800; color: var(--red); }
 .cp-table td.pos { font-weight: 700; width: 40px; text-align: center; }
+.cp-subs { border-top: 1.5px solid var(--ink); margin-top: 8px; padding-top: 6px; }
+.cp-subs-h { font-size: 9px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 800; margin-bottom: 4px; }
+.cp-subs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 12px; }
+.cp-sub { font-size: 11px; display: flex; gap: 6px; }
+.cp-sub-n { font-weight: 800; color: var(--navy); min-width: 18px; }
+.cp-sub-none { color: var(--muted); font-size: 11px; }
 .cp-foot { border-top: 1.5px solid var(--ink); margin-top: 8px; padding-top: 6px; font-size: 11px; color: #33414f; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
 dialog { border: none; border-radius: 12px; padding: 20px; max-width: 360px; box-shadow: 0 20px 60px rgba(0,0,0,.35); }

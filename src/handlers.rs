@@ -286,14 +286,15 @@ async fn replace_spots(
         .await?;
     for spot in spots {
         sqlx::query(
-            "INSERT INTO lineup_spots (lineup_id, batting_order, slot_kind, player_id, position) \
-             VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO lineup_spots (lineup_id, batting_order, slot_kind, player_id, position, is_dh) \
+             VALUES (?, ?, ?, ?, ?, ?)",
         )
         .bind(lineup_id)
         .bind(spot.batting_order)
         .bind(&spot.slot_kind)
         .bind(spot.player_id)
         .bind(&spot.position)
+        .bind(spot.is_dh as i64)
         .execute(&state.pool)
         .await?;
     }

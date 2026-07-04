@@ -27,10 +27,12 @@ enum Variant {
 impl Variant {
     fn size_mm(self) -> (f64, f64) {
         match self {
-            // 3.75 x 5.5 in — roomy, still fits two across a Letter page.
-            Variant::Large => (3.75 * IN, 5.5 * IN),
-            // 3.5 x 5.0 in — fits standard umpire lineup-card holders.
-            Variant::Umpire => (3.5 * IN, 5.0 * IN),
+            // 3.75 in wide, tall enough for the batting order + full substitutes
+            // list; still fits two across a Letter page.
+            Variant::Large => (3.75 * IN, 8.0 * IN),
+            // 3.5 in wide fits standard umpire holders; taller so it lists every
+            // eligible substitute (the umpire folds it).
+            Variant::Umpire => (3.5 * IN, 7.0 * IN),
         }
     }
 
@@ -128,6 +130,7 @@ pub fn render_sheet(
             team,
             lineup,
             spots,
+            players,
             &player_map,
         );
     }
@@ -273,6 +276,7 @@ fn draw_card(
     team: &Team,
     lineup: &Lineup,
     spots: &[LineupSpot],
+    players: &[Player],
     player_map: &HashMap<i64, &Player>,
 ) {
     let pad = 2.2;
@@ -390,9 +394,52 @@ fn draw_card(
     hline(layer, x + pad, x + w * 0.62, sig_y, 0.3);
     text(layer, &fonts.regular, "Manager signature", small - 1.5, x + pad, y + 1.6);
 
+    // ---- Substitutes (every eligible bench player) ----
+    let assigned: Vec<i64> = spots.iter().filter_map(|s| s.player_id).collect();
+    let subs: Vec<&Player> = players
+        .iter()
+        .filter(|p| !assigned.contains(&p.id))
+        .collect();
+
+    let sub_size = small - 0.5;
+    let subs_line = sub_size * 0.5 + 2.2;
+    let subs_head = sub_size + 1.5;
+    let subs_rows = ((subs.len() + 1) / 2).max(1);
+    let subs_h = subs_head + subs_rows as f64 * subs_line + 3.0;
+    let subs_top = footer_top + subs_h;
+    hline(layer, x, x + w, subs_top, 0.5);
+
+    text(
+        layer,
+        &fonts.bold,
+        "SUBSTITUTES",
+        sub_size,
+        x + pad,
+        subs_top - subs_head,
+    );
+
+    let numcol = if variant == Variant::Large { 7.0 } else { 6.0 };
+    let col2_x = x + w / 2.0 + 1.0;
+    let col_w = w / 2.0 - pad - 2.0;
+    let mut row_base = subs_top - subs_head - subs_line + 0.5;
+    if subs.is_empty() {
+        text(layer, &fonts.regular, "None", sub_size, x + pad, row_base);
+    } else {
+        for (i, p) in subs.iter().enumerate() {
+            let col = i % 2;
+            if col == 0 && i > 0 {
+                row_base -= subs_line;
+            }
+            let cx = if col == 0 { x + pad } else { col2_x };
+            text(layer, &fonts.bold, &p.number, sub_size, cx, row_base);
+            let nm = truncate_to(&p.name, sub_size, col_w - numcol);
+            text(layer, &fonts.regular, &nm, sub_size, cx + numcol, row_base);
+        }
+    }
+
     // ---- Batting order table ----
     let table_top = header_bottom - 1.0;
-    let table_bottom = footer_top + 1.0;
+    let table_bottom = subs_top + 1.0;
     let table_h = table_top - table_bottom;
 
     // Columns: order | no | player | pos
@@ -437,7 +484,19 @@ fn draw_card(
         text(layer, &fonts.regular, &num, hdr_size, col_no, baseline);
         let pname = truncate_to(&pname, hdr_size, col_pos - col_player - 1.5);
         text(layer, &fonts.regular, &pname, hdr_size, col_player, baseline);
-        text(layer, &fonts.bold, &spot.position, hdr_size, col_pos, baseline);
+
+        // Two-way DH (high school): a defender who is also the DH -> "SS/DH".
+        let pos_label = if spot.is_dh != 0 {
+            if spot.position.is_empty() {
+                "DH".to_string()
+            } else {
+                format!("{}/DH", spot.position)
+            }
+        } else {
+            spot.position.clone()
+        };
+        let pos_label = truncate_to(&pos_label, hdr_size, col_pos_right - col_pos);
+        text(layer, &fonts.bold, &pos_label, hdr_size, col_pos, baseline);
     }
 }
 
@@ -520,15 +579,17 @@ mod tests {
                 batting_order: 1,
                 slot_kind: "BAT".into(),
                 player_id: Some(1),
-                position: "SS".into(),
+                position: "P".into(),
+                is_dh: 1,
             },
             LineupSpot {
                 id: 2,
                 lineup_id: 1,
-                batting_order: 10,
-                slot_kind: "DH".into(),
+                batting_order: 2,
+                slot_kind: "BAT".into(),
                 player_id: None,
-                position: "DH".into(),
+                position: "SS".into(),
+                is_dh: 0,
             },
         ];
         (team, lineup, spots, players)

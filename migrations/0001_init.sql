@@ -51,5 +51,7 @@ CREATE TABLE IF NOT EXISTS lineup_spots (
     batting_order INTEGER NOT NULL,
     slot_kind     TEXT NOT NULL DEFAULT 'BAT',
     player_id     INTEGER REFERENCES players(id) ON DELETE SET NULL,
-    position      TEXT NOT NULL DEFAULT ''
+    position      TEXT NOT NULL DEFAULT '',
+    -- High-school two-way player: bats and also plays defense as the DH.
+    is_dh         INTEGER NOT NULL DEFAULT 0
 );

@@ -13,6 +13,7 @@ const state = {
     // spots keyed by a stable slot id: "1".."9", "DH", "EH"
     assignments: {}, // slotId -> playerId
     positions: {}, // slotId -> position string
+    twoWayDH: {}, // slotId -> bool (high-school two-way DH: fields AND is the DH)
     meta: { opponent: "", game_date: "", location: "", home_away: "", use_dh: false, use_eh: false, name: "" },
     dirty: false,
 };
@@ -166,6 +167,7 @@ function newLineup() {
     state.lineupId = null;
     state.assignments = {};
     state.positions = {};
+    state.twoWayDH = {};
     state.meta = { opponent: "", game_date: "", location: "", home_away: "", use_dh: false, use_eh: false, name: "" };
     // default fielding positions for the first nine spots
     for (let i = 1; i <= 9; i++) state.positions[String(i)] = POSITIONS[i - 1] || "";
@@ -197,10 +199,12 @@ async function loadLineup(id) {
     };
     state.assignments = {};
     state.positions = {};
+    state.twoWayDH = {};
     for (const sp of detail.spots) {
         const slot = sp.slot_kind === "DH" ? "DH" : sp.slot_kind === "EH" ? "EH" : String(sp.batting_order);
         if (sp.player_id != null) state.assignments[slot] = sp.player_id;
         state.positions[slot] = sp.position || "";
+        if (sp.is_dh) state.twoWayDH[slot] = true;
     }
     fillMetaFields();
     renderAll();
@@ -216,6 +220,7 @@ function collectSpots() {
             slot_kind: kind,
             player_id: state.assignments[id] != null ? state.assignments[id] : null,
             position: state.positions[id] || "",
+            is_dh: !!state.twoWayDH[id],
         });
     }
     return spots;
@@ -335,6 +340,20 @@ function renderSpots() {
         sel.onchange = () => { state.positions[id] = sel.value; renderPreview(); };
         li.appendChild(sel);
 
+        // Two-way DH toggle (high school): this fielder is also the DH.
+        if (!isSpecial) {
+            const dh = el("button", "dhbtn" + (state.twoWayDH[id] ? " on" : ""), "DH");
+            dh.type = "button";
+            dh.title = "High-school two-way player: fields and is the DH (shows as POS/DH)";
+            dh.onclick = () => {
+                const wasOn = !!state.twoWayDH[id];
+                state.twoWayDH = {}; // only one DH per lineup
+                if (!wasOn) state.twoWayDH[id] = true;
+                renderAll();
+            };
+            li.appendChild(dh);
+        }
+
         // Clear button
         const clr = el("button", "clear", "✕");
         clr.title = "Clear spot";
@@ -414,10 +433,31 @@ function renderPreview() {
         const p = pid != null ? state.players.find((pl) => pl.id == pid) : null;
         tr.appendChild(el("td", "n", p ? (p.number || "") : ""));
         tr.appendChild(el("td", "name", p ? p.name : ""));
-        tr.appendChild(el("td", "pos", state.positions[id] || ""));
+        let posLabel = state.positions[id] || "";
+        if (state.twoWayDH[id]) posLabel = posLabel ? posLabel + "/DH" : "DH";
+        tr.appendChild(el("td", "pos", posLabel));
         table.appendChild(tr);
     }
     box.appendChild(table);
+
+    // Substitutes: every roster player not in the batting order.
+    const placed = placedPlayerIds();
+    const subs = state.players.filter((p) => !placed.has(p.id));
+    const subWrap = el("div", "cp-subs");
+    subWrap.appendChild(el("div", "cp-subs-h", "SUBSTITUTES"));
+    const subGrid = el("div", "cp-subs-grid");
+    if (subs.length === 0) {
+        subGrid.appendChild(el("span", "cp-sub-none", "None"));
+    } else {
+        for (const p of subs) {
+            const s = el("span", "cp-sub");
+            s.appendChild(el("span", "cp-sub-n", p.number || "—"));
+            s.appendChild(el("span", null, p.name));
+            subGrid.appendChild(s);
+        }
+    }
+    subWrap.appendChild(subGrid);
+    box.appendChild(subWrap);
 
     const foot = el("div", "cp-foot");
     if (state.team && state.team.head_coach) foot.appendChild(el("div", null, "Head Coach: " + state.team.head_coach));

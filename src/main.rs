@@ -44,6 +44,18 @@ async fn main() -> anyhow::Result<()> {
     let schema = include_str!("../migrations/0001_init.sql");
     sqlx::raw_sql(schema).execute(&pool).await?;
 
+    // Additive migrations for databases created before a column existed.
+    // (CREATE TABLE IF NOT EXISTS won't add new columns to an existing table.)
+    let has_is_dh: Option<(i64,)> =
+        sqlx::query_as("SELECT 1 FROM pragma_table_info('lineup_spots') WHERE name = 'is_dh'")
+            .fetch_optional(&pool)
+            .await?;
+    if has_is_dh.is_none() {
+        sqlx::query("ALTER TABLE lineup_spots ADD COLUMN is_dh INTEGER NOT NULL DEFAULT 0")
+            .execute(&pool)
+            .await?;
+    }
+
     let state = AppState { pool };
 
     let api = Router::new()

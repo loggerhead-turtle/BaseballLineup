@@ -44,6 +44,7 @@ pub struct LineupSpot {
     pub slot_kind: String,
     pub player_id: Option<i64>,
     pub position: String,
+    pub is_dh: i64,
 }
 
 // ---- Request payloads ----
@@ -80,6 +81,8 @@ pub struct SpotPayload {
     pub player_id: Option<i64>,
     #[serde(default)]
     pub position: String,
+    #[serde(default)]
+    pub is_dh: bool,
 }
 
 fn default_slot_kind() -> String {
