@@ -54,7 +54,9 @@ impl Variant {
     fn size_mm(self) -> (f64, f64) {
         match self {
             Variant::Large => (3.75 * IN, 8.0 * IN),
-            Variant::Umpire => (3.5 * IN, 7.0 * IN),
+            // Taller than the large card so the tall header (magnet clearance)
+            // doesn't squeeze the rows.
+            Variant::Umpire => (3.5 * IN, 7.5 * IN),
         }
     }
 
@@ -346,12 +348,17 @@ fn draw_card(
     rect(layer, x, y, w, h, 0.8, ink());
 
     // ---- Header ----
-    let header_h = if variant == Variant::Large { 22.0 } else { 18.0 };
+    // The umpire card's header is ~1.25 in tall so the umpire-wallet magnet
+    // (which sits ~1.25 in down) covers only the header, not the first batter.
+    let header_h = if variant == Variant::Large { 22.0 } else { 32.0 };
     let header_bottom = top - header_h;
 
-    let logo_h = header_h - 2.0 * pad;
+    // Logo is top-aligned with a capped height, so a tall header leaves the
+    // lower (magnet) zone empty rather than blowing the logo up.
+    let logo_max = if variant == Variant::Large { 18.0 } else { 14.0 };
+    let logo_h = (header_h - 2.0 * pad).min(logo_max);
     let logo_x = x + pad;
-    let logo_y = header_bottom + pad;
+    let logo_y = top - pad - logo_h;
     let mut logo_w_used = 0.0;
     let mut logo_drawn = false;
     if let Some(url) = &team.logo_path {
